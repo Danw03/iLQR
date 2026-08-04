@@ -105,7 +105,7 @@ while iter < opts.max_iter && delta_J > opts.tolerance
     X = X_new;
     Uopt = U_new;
 
-    delta_J = J - J_new;
+    delta_J = (J - J_new) / max(1, J);
 
     J = J_new;
 
