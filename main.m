@@ -36,7 +36,7 @@ params.solver.armijo = 0.1;
 params.solver.alpha_decay = 0.5;
 params.solver.regulization1 = 1e-6;
 params.solver.regulization2 = 1e-6;
-params.solver.substeps = 5;
+params.solver.substeps = 1;
 
 %% Gait Parameters
 % 0: Standing on all
@@ -48,11 +48,11 @@ params.solver.substeps = 5;
 params.gait = 1;
 params.v_des = [1; 0; 0];  % m/s
 params.a_des = 10;         % m/s^2
-params.w_des = 0;          % deg/s
-params.alpha_des = 60;     % deg/s^2
+params.w_des = 0.0;        % rad/s
+params.alpha_des = 1.0;    % rad/s^2
 
-params.t_stance = 0.1;
-params.t_swing = 0.2;
+params.t_stance = 0.12;
+params.t_swing = 0.18;
 
 %% Disturbance Parameters
 params.disturbance.time = [2; 2.2];
@@ -127,4 +127,4 @@ for step = 1:steps
 end
 
 finalReport(history);
-visualize(history, params);
+% visualize(history, params);

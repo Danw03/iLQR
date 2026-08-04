@@ -9,8 +9,8 @@ dt = p.control_dt;
 
 v_target_body = p.v_des(1:2);
 a_limit = abs(p.a_des);
-w_target = (pi / 180) * p.w_des;
-alpha_limit = abs((pi / 180) * p.alpha_des);
+w_target = p.w_des;
+alpha_limit = abs(p.alpha_des);
 
 Xref_mat = zeros(nx, N);
 
