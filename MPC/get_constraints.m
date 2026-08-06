@@ -3,21 +3,21 @@ function [g, Gu] = get_constraints(u, contact, p)
 
 mu = p.mu;
 
-Gfoot = [ 1,  0, -mu;
-         -1,  0, -mu;
-          0,  1, -mu;
-          0, -1, -mu;
-          0,  0,  1;
-          0,  0, -1];
+Gfoot = [ 1,  0, -mu;   %  fx <= mu*fz
+         -1,  0, -mu;   % -fx <= mu*fz
+          0,  1, -mu;   %  fy <= mu*fz
+          0, -1, -mu;   % -fy <= mu*fz
+          0,  0,  1;    %  fz <= f_Max
+          0,  0, -1];   % -fz <= -f_min
 
 hfoot = [0;
          0;
          0;
          0;
          p.f_Max;
-       
+        -p.f_min];
 
-stance_legs = find(contact == 1);
+stance_legs = find(contact(:) == 1);
 num_stance = numel(stance_legs);
 
 g  = zeros(6*num_stance, 1);
@@ -30,7 +30,8 @@ for j = 1:num_stance
     row_idx = 6*(j-1) + (1:6);
 
     Gu(row_idx, force_idx) = Gfoot;
-    g(row_idx) = Gfoot*u(force_idx) - hfoot;
+    g(row_idx) = ...
+        Gfoot*u(force_idx) - hfoot;
 end
 
 end

@@ -30,12 +30,13 @@ params.control_dt = 0.025;
 
 %% iLQR Parameters
 params.solver.max_iter = 10;
-params.solver.max_line_search_iter = 5;
-params.solver.tolerance = 0.01;
-params.solver.armijo = 0.1;
-params.solver.alpha_decay = 0.5;
-params.solver.regulization1 = 1e-6;
-params.solver.regulization2 = 1e-6;
+params.solver.tolerance = 1e-2;
+params.solver.active_tolerance = 1e-3;
+params.solver.lambda_tolerance = 1e-9;
+params.solver.regulization1 = 1e-5;
+params.solver.regulization2 = 1e-5;
+params.solver.alpha = 2.0;
+params.solver.beta = 0.9;
 params.solver.substeps = 1;
 
 %% Gait Parameters
@@ -45,14 +46,14 @@ params.solver.substeps = 1;
 % 3: Bounding
 % 4: Galloping
 % 5: Pacing
-params.gait = 1;
-params.v_des = [1; 0; 0];  % m/s
+params.gait = 2;
+params.v_des = [0; 0; 0];  % m/s
 params.a_des = 10;         % m/s^2
 params.w_des = 0.0;        % rad/s
-params.alpha_des = 1.0;    % rad/s^2
+params.alpha_des = 0.0;    % rad/s^2
 
-params.t_stance = 0.12;
-params.t_swing = 0.18;
+params.t_stance = 0.1;
+params.t_swing = 0.4;
 
 %% Disturbance Parameters
 params.disturbance.time = [2; 2.2];
@@ -69,7 +70,7 @@ params.Q_weight = diag([ 1  1  1,  ... % roll, pitch, yaw weight
 params.R_weight = 1e-6 * eye(12);
 
 %% Simulation Configuration
-steps = 400;    % simulation time: 10s (0.025 * 400 = 10)
+steps = 450;    % simulation time: 10s (0.025 * 400 = 10)
 sim_steps = round(params.control_dt / params.sim_dt);
 
 
@@ -112,7 +113,7 @@ for step = 1:steps
     R = get_R(Xc, Xref, contact, params, R);
 
     tic;
-    [Uopt, final_cost, iter] = solve_iLQR(Xc, Xref, R, Uopt, contact, params);
+    [Uopt, final_cost, iter, solver_log] = solve_iLQR(Xc, Xref, R, Uopt, contact, params);
     history.solver_time(step) = toc;
     history.solver_cost(step) = final_cost;
     history.solver_iter(step) = iter;
@@ -123,8 +124,8 @@ for step = 1:steps
 
     Xc = Xseries(:, end);
 
-    fprintf("step %d / %d:\n  J_final   = %.6f\n  iteration = %d\n\n", step, steps, final_cost, iter);
+    print_solver_summary(step, steps, final_cost, iter, solver_log);
 end
 
 finalReport(history);
-% visualize(history, params);
+visualize(history, params);

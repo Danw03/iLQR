@@ -1,4 +1,4 @@
-function [Uopt, J, iter] = solve_iLQR(Xc, Xref, R, Upre, contact, p)
+function [Uopt, J, iter, solver_log] = solve_iLQR(Xc, Xref, R, Upre, contact, p)
 %% Trajectory optimizer based on iLQR
 % Xc: current State (13 x 1)
 % Xref: reference over a horizon (13*k x 1)
@@ -15,12 +15,44 @@ iter = 0;
 mu1 = opts.regulization1;
 mu2 = opts.regulization2;
 
+Alpha = opts.alpha;
+Beta = opts.beta;
+
 Q_weight = p.Q_weight;
 R_weight = p.R_weight;
 N = p.k;
 
+solver_log.active_count = [];
+solver_log.active_added = [];
+solver_log.active_removed = [];
+
+solver_log.J_before = [];
+solver_log.J_candidate = [];
+solver_log.reduction = [];
+solver_log.accepted = [];
+
+previous_active_history = cell(1, N-1);
+has_previous_active = false;
+
 Xref = reshape(Xref, 13, N);    % 13*N X 1 --> 13 X N
 R = reshape(R, 12, N);          % 12*N X 1 --> 12 X N
+
+solver_log.active_count = [];
+solver_log.active_added = [];
+solver_log.active_removed = [];
+
+solver_log.J_before = [];
+solver_log.J_candidate = [];
+solver_log.reduction = [];
+solver_log.accepted = [];
+
+solver_log.mu1_before = [];
+solver_log.mu2_before = [];
+solver_log.mu1_after = [];
+solver_log.mu2_after = [];
+
+previous_active_history = cell(1, N-1);
+has_previous_active = false;
 
 Uopt = warm_start(Upre, contact, p);
 X = roll_out(Xc, Uopt, R, contact, p);
@@ -30,6 +62,8 @@ delta_J = inf;
 
 %% Solver Loop
 while iter < opts.max_iter && delta_J > opts.tolerance
+    active_history = cell(1, N-1);
+
     u_ff = zeros(12, N-1);
     K = zeros(12, 13, N-1);
     Qu_history = zeros(12, N-1);
@@ -50,67 +84,91 @@ while iter < opts.max_iter && delta_J > opts.tolerance
         Qux = B'*(Vxx + mu1 * eye(13))*A;
 
         % Update policy
-        u_ff(:, i) = - Quu \ Qu;
-        K(:, :, i) = - Quu \ Qux;
+        Quu = 0.5 * (Quu + Quu');
+
+        [g, Gu] = get_constraints(Uopt(:, i), contact(:, i), p);
+        
+        [j, K_i, active_rows, lambda_active] = solve_constrained_policy(Quu, Qu, Qux, g, Gu, opts.active_tolerance, opts.lambda_tolerance);
+        
+        u_ff(:, i) = j;
+        K(:, :, i) = K_i;
+
+        active_history{i} = active_rows(:);
 
         % Update Vx, Vxx
         Vx = Qx - K(:, :, i)' * Quu * u_ff(:, i);
         Vxx = Qxx - K(:, :, i)' * Quu * K(:, :, i);
     end
 
-    %% Line Search
-    alpha = 1;
-    lineSearchIter = 0;
-    J_new = inf;
+    %% Active-set tracking
+    active_count = sum(cellfun(@numel, active_history));
     
+    active_added = 0;
+    active_removed = 0;
+    
+    if has_previous_active
+        for i = 1:N-1
+            active_added = active_added + numel(setdiff(active_history{i}, previous_active_history{i}));
+            active_removed = active_removed + numel(setdiff( previous_active_history{i}, active_history{i}));
+        end
+    end
+
+    %% Forward Pass
+    J_init = J;
+
     X_new = zeros(13, N);
     U_new = zeros(12, N-1);
-    accepted = false;
-    
-    while lineSearchIter < opts.max_line_search_iter
-        dJ = 0;
-        X_new(:, 1) = X(:, 1);
-        
-        %% Forward Rollout
-        for i = 1:N-1
-            % un' = un + alpha * uff + K(Xn' - Xn)
-            U_new(:, i) = Uopt(:, i) + alpha * u_ff(:, i) + K(:, :, i) * (X_new(:, i) - X(:, i));
 
-            % Xn+1 = f(Xn, Un)
-            X_new(:, i+1) = forward_dynamics(X_new(:, i), U_new(:, i), R(:, i), contact(:, i), p);
+    X_new(:, 1) = X(:, 1);
 
-            dJ = dJ + alpha * (Qu_history(:, i)' * u_ff(:, i));
-        end
-        
-        J_new = calc_cost(X_new, Xref, U_new, p);
-        
-        % Armijo Termination Condition
-        if isfinite(J_new) && J_new < J + opts.armijo * dJ
-            accepted = true;
-            break;
-        end
+    for i = 1:N-1
+        delta_X = X_new(:, i) - X(:, i);
 
-        alpha = opts.alpha_decay * alpha;
-        lineSearchIter = lineSearchIter + 1;
-    end
-    
-    if ~accepted
-        error('solve_iLQR:LineSearchFailed', ...
-            ['Line search failed at solver iteration %d. ' ...
-             'No acceptable trajectory was found after %d attempts.'], ...
-            iter, lineSearchIter);
+        u_raw = Uopt(:, i) + u_ff(:, i) + K(:, :, i) * delta_X;
+        U_new(:, i) = clamp_force(u_raw, contact(:, i), p);
+
+        X_new(:, i+1) = forward_dynamics(X_new(:, i), U_new(:, i), R(:, i), contact(:, i), p);
     end
 
-    % Update trajectory
-    X = X_new;
-    Uopt = U_new;
+    % Acceptance check
+    J_new = calc_cost(X_new, Xref, U_new, p);
+    actual_reduction = J_init - J_new;
 
-    delta_J = (J - J_new) / max(1, J);
+    accepted = isfinite(J_new) && J_new < J_init;
 
-    J = J_new;
+    if accepted
+        % Accept
+        X = X_new;
+        Uopt = U_new;
+        J = J_new;
+    
+        delta_J = actual_reduction / max(1, abs(J_init));
+    
+        mu1 = Beta*mu1;
+        mu2 = Beta*mu2;
+    
+    else
+        % Reject
+        delta_J = inf;
+    
+        mu1 = Alpha*mu1;
+        mu2 = Alpha*mu2;
+    end
 
+    %% Save tracking log
+    log_idx = iter + 1;
+    solver_log.active_count(log_idx) = active_count;
+    solver_log.active_added(log_idx) = active_added;
+    solver_log.active_removed(log_idx) = active_removed;
+    solver_log.J_before(log_idx) = J_init;
+    solver_log.J_candidate(log_idx) = J_new;
+    solver_log.reduction(log_idx) = actual_reduction;
+    solver_log.accepted(log_idx) = accepted;
+    previous_active_history = active_history;
+    has_previous_active = true;
+    
     iter = iter + 1;
-
+    
 end
 
 end
