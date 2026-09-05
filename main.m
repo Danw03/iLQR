@@ -37,6 +37,13 @@ params.solver.regulization1 = 1e-5;
 params.solver.regulization2 = 1e-5;
 params.solver.alpha = 2.0;
 params.solver.beta = 0.9;
+% Algorithm 2: forward subQP and trust-region settings.
+params.solver.trust_region = 1000;
+params.solver.trust_region_decay = 0.5;
+params.solver.min_trust_region = 1e-3;
+params.solver.max_trust_region_restarts = 12;
+params.solver.qp_max_iter = 100;
+params.solver.feasibility_tolerance = 1e-7;
 params.solver.substeps = 1;
 
 %% Gait Parameters
@@ -46,14 +53,14 @@ params.solver.substeps = 1;
 % 3: Bounding
 % 4: Galloping
 % 5: Pacing
-params.gait = 2;
-params.v_des = [0; 0; 0];  % m/s
+params.gait = 1;
+params.v_des = [5; 0; 0];  % m/s
 params.a_des = 10;         % m/s^2
 params.w_des = 0.0;        % rad/s
-params.alpha_des = 0.0;    % rad/s^2
+params.alpha_des = 100;    % rad/s^2
 
-params.t_stance = 0.1;
-params.t_swing = 0.4;
+params.t_stance = 0.12;
+params.t_swing = 0.18;
 
 %% Disturbance Parameters
 params.disturbance.time = [2; 2.2];
@@ -70,7 +77,7 @@ params.Q_weight = diag([ 1  1  1,  ... % roll, pitch, yaw weight
 params.R_weight = 1e-6 * eye(12);
 
 %% Simulation Configuration
-steps = 450;    % simulation time: 10s (0.025 * 400 = 10)
+steps = 400;    % simulation time: 10s (0.025 * 400 = 10)
 sim_steps = round(params.control_dt / params.sim_dt);
 
 

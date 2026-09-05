@@ -1,0 +1,30 @@
+# MATLAB 자동 생성 파일
+*.asv
+*.autosave
+*.m~
+*.slxc
+*.mexw64
+
+# MATLAB 프로젝트/캐시
+slprj/
+codegen/
+*.prj
+*.sldd
+
+# 결과 및 이미지 폴더
+Fig/
+results/
+
+# 임시 및 백업
+temp/
+tmp/
+backup/
+old/
+참고코드/
+
+# 운영체제 파일
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/

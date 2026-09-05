@@ -40,15 +40,12 @@ for k = 1:N-1
 
     % Acceleration-limited yaw-rate command.
     angular_acceleration = (w_target - yaw_rate) / dt;
-    angular_acceleration = min(max( ...
-        angular_acceleration, -alpha_limit), alpha_limit);
+    angular_acceleration = min(max(angular_acceleration, -alpha_limit), alpha_limit);
 
-    yaw_next = yaw + yaw_rate*dt ...
-             + 0.5*angular_acceleration*dt^2;
+    yaw_next = yaw + yaw_rate*dt + 0.5*angular_acceleration*dt^2;
     yaw_rate_next = yaw_rate + angular_acceleration*dt;
 
-    position_next = position + velocity*dt ...
-                  + 0.5*acceleration*dt^2;
+    position_next = position + velocity*dt + 0.5*acceleration*dt^2;
     velocity_next = velocity + acceleration*dt;
 
     Xref_mat(:, k+1) = Xref_mat(:, k);

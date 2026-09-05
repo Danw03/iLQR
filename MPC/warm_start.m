@@ -35,12 +35,9 @@ for k = columns_to_initialize
 end
 
 for k = 1:n_controls
-    for leg = 1:4
-        if contact(leg, k) == 0
-            idx = 3*(leg-1) + (1:3);
-            U(idx, k) = 0;
-        end
-    end
+    % CDDP starts from a feasible trajectory, including new stance contacts.
+    % Projection is only for initialization; forward updates use subQPs.
+    U(:, k) = clamp_force(U(:, k), contact(:, k), p);
 end
 
 end
